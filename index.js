@@ -3,7 +3,7 @@ const cors = require('cors');
 const app = express();
 const port = process.env.PORT || 3000;
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 
 // middleware
@@ -36,6 +36,7 @@ async function run() {
             const result = await constructionStaffsCollection.find().toArray();
             res.send(result);
         })
+
         app.post('/construction_staffs', async (req, res) => {
             const data = req.body;
             try {
@@ -44,6 +45,13 @@ async function run() {
             } catch (err) {
                 res.status(500).send({ error: "Failed to insert user request" });
             }
+        })
+
+        app.delete('/construction_staffs/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await constructionStaffsCollection.deleteOne(filter);
+            res.send(result);
         })
 
 
