@@ -31,7 +31,9 @@ async function run() {
 
 
         const constructionStaffsCollection = client.db('Active-Interior').collection('construction_staffs');
+        const constructionProjectsCollection = client.db('Active-Interior').collection('construction_projects');
 
+        // ------------- Construction Staffs
         app.get('/construction_staffs', async (req, res) => {
             const result = await constructionStaffsCollection.find().toArray();
             res.send(result);
@@ -46,13 +48,64 @@ async function run() {
                 res.status(500).send({ error: "Failed to insert user request" });
             }
         })
-
+        app.patch('/construction_staffs/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id)};
+            const {attendance_data} = req.body;
+            const result = await constructionStaffsCollection.updateOne(
+                { _id: filter._id },
+                { $set: { staff_working_details: attendance_data } }
+            );
+            res.send(result);
+        })
         app.delete('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const result = await constructionStaffsCollection.deleteOne(filter);
             res.send(result);
         })
+
+
+        // -------------------- Construction Projects
+        app.get('/construction_projects', async (req, res) => {
+            const result = await constructionProjectsCollection.find().toArray();
+            res.send(result);
+        })
+
+        app.post('/construction_projects', async (req, res) => {
+            const data = req.body;
+            try {
+                const result = await constructionProjectsCollection.insertOne(data);
+                res.send(result);
+            } catch (err) {
+                res.status(500).send({ error: "Failed to insert user request" });
+            }
+        })
+        app.delete('/construction_projects/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await constructionProjectsCollection.deleteOne(filter);
+            res.send(result);
+        })
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
