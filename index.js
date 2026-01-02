@@ -50,13 +50,24 @@ async function run() {
         })
         app.patch('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
-            const filter = { _id: new ObjectId(id)};
-            const {attendance_data} = req.body;
-            const result = await constructionStaffsCollection.updateOne(
-                { _id: filter._id },
-                { $set: { staff_working_details: attendance_data } }
-            );
-            res.send(result);
+            const attendance_data = req.body.attendance_data;
+            const transection_data = req.body.transection_data;
+            console.log(attendance_data);
+            console.log(transection_data);
+            if (attendance_data) {
+                const result = await constructionStaffsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { staff_working_details: attendance_data } }
+                );
+                res.send(result);
+            }
+            else if (transection_data) {
+                const result = await constructionStaffsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    { $set: { staff_transections: transection_data } }
+                );
+                res.send(result);
+            }
         })
         app.delete('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
@@ -72,6 +83,14 @@ async function run() {
             res.send(result);
         })
 
+
+        app.get('/construction_projects/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const result = await constructionProjectsCollection.findOne(filter);
+            res.send(result);
+        })
+
         app.post('/construction_projects', async (req, res) => {
             const data = req.body;
             try {
@@ -81,6 +100,18 @@ async function run() {
                 res.status(500).send({ error: "Failed to insert user request" });
             }
         })
+
+        app.put('/construction_projects/:id', async (req, res) => {
+            const id = req.params.id;
+            const costData = req.body;
+            const filter = { _id: new ObjectId(id) };
+            const updateDoc = {
+                $push: { project_cost: costData }
+            }
+            const result = await constructionProjectsCollection.updateOne(filter, updateDoc, { upsert: true });
+            res.send(result);
+        })
+
         app.delete('/construction_projects/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
