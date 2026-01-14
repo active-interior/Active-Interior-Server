@@ -52,23 +52,31 @@ async function run() {
             const id = req.params.id;
             const attendance_data = req.body.attendance_data;
             const transection_data = req.body.transection_data;
-            console.log(attendance_data);
-            console.log(transection_data);
+            const staff = await constructionStaffsCollection.findOne({_id: new ObjectId(id)});
             if (attendance_data) {
                 const result = await constructionStaffsCollection.updateOne(
                     { _id: new ObjectId(id) },
-                    { $set: { staff_working_details: attendance_data } }
+                    { $set: { 
+                        staff_working_details: [ ...staff.staff_working_details, attendance_data],
+                        income: staff.income + attendance_data.income,
+                        available_balance: staff.available_balance + attendance_data.income
+                    } }
                 );
                 res.send(result);
             }
             else if (transection_data) {
                 const result = await constructionStaffsCollection.updateOne(
                     { _id: new ObjectId(id) },
-                    { $set: { staff_transections: transection_data } }
+                    { $set: { 
+                        staff_transections: [...staff.staff_transections, transection_data],
+                        withdraw: staff.withdraw + transection_data.amount,
+                        available_balance: staff.available_balance - transection_data.amount
+                    } }
                 );
                 res.send(result);
             }
         })
+
         app.delete('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
@@ -76,7 +84,23 @@ async function run() {
             res.send(result);
         })
 
-
+        app.patch('/close_construction_staffs/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id)
+            const data = req.body
+            const result = await constructionStaffsCollection.updateOne(
+                { _id: new ObjectId(id) },
+                {
+                    $set: {
+                        due: data.due,
+                        income: data.income,
+                        withdraw: data.withdraw,
+                    }
+                }
+            )
+            console.log(result)
+            res.send(result);
+        })
         // -------------------- Construction Projects
         app.get('/construction_projects', async (req, res) => {
             const result = await constructionProjectsCollection.find().toArray();
