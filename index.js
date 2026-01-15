@@ -38,6 +38,11 @@ async function run() {
             const result = await constructionStaffsCollection.find().toArray();
             res.send(result);
         })
+        app.get('/construction_staffs/:id', async(req, res) => {
+            const id = req.params.id;
+            const result = await constructionStaffsCollection.findOne({_id: new ObjectId(id)});
+            res.send(result);
+        })
 
         app.post('/construction_staffs', async (req, res) => {
             const data = req.body;
@@ -86,7 +91,6 @@ async function run() {
 
         app.patch('/close_construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
-            console.log(id)
             const data = req.body
             const result = await constructionStaffsCollection.updateOne(
                 { _id: new ObjectId(id) },
@@ -95,10 +99,32 @@ async function run() {
                         due: data.due,
                         income: data.income,
                         withdraw: data.withdraw,
+                        last_closing_date: data.last_closing_date
                     }
                 }
             )
-            console.log(result)
+            res.send(result);
+        })
+        app.patch('/construction_staffs_edit_form/:id', async (req, res) => {
+            const id = req.params.id;
+            const {staff_name, staff_address, staff_number, work_category, staff_category, staff_nid, staff_emergency, staff_blood, staff_salary, staff_reference} = req.body;
+            const result = await constructionStaffsCollection.updateOne(
+                {_id: new ObjectId(id)},
+                {
+                    $set: {
+                        staff_name,
+                        staff_address,
+                        staff_number,
+                        work_category,
+                        staff_category,
+                        staff_nid,
+                        staff_emergency,
+                        staff_blood,
+                        staff_salary,
+                        staff_reference
+                    }
+                }
+            )
             res.send(result);
         })
         // -------------------- Construction Projects
