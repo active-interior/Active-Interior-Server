@@ -32,6 +32,7 @@ async function run() {
 
         const constructionStaffsCollection = client.db('Active-Interior').collection('construction_staffs');
         const constructionProjectsCollection = client.db('Active-Interior').collection('construction_projects');
+        const workCategoryCollection = client.db('Active-Interior').collection('work_category');
 
         // ------------- Construction Staffs
         app.get('/construction_staffs', async (req, res) => {
@@ -127,6 +128,17 @@ async function run() {
             )
             res.send(result);
         })
+
+
+        // ==================== Work Category ===========================
+
+        app.get('/work_category', async (req, res) => {
+            const result = await workCategoryCollection.findOne({});
+            res.send(result);
+        })
+
+
+        // ================== End Work Category =========================
         // -------------------- Construction Projects
         app.get('/construction_projects', async (req, res) => {
             const result = await constructionProjectsCollection.find().toArray();
