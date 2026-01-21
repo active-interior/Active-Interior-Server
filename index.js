@@ -39,9 +39,9 @@ async function run() {
             const result = await constructionStaffsCollection.find().toArray();
             res.send(result);
         })
-        app.get('/construction_staffs/:id', async(req, res) => {
+        app.get('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
-            const result = await constructionStaffsCollection.findOne({_id: new ObjectId(id)});
+            const result = await constructionStaffsCollection.findOne({ _id: new ObjectId(id) });
             res.send(result);
         })
 
@@ -55,33 +55,44 @@ async function run() {
             }
         })
         app.patch('/construction_staffs/:id', async (req, res) => {
-            const id = req.params.id;
-            const attendance_data = req.body.attendance_data;
-            const transection_data = req.body.transection_data;
-            const staff = await constructionStaffsCollection.findOne({_id: new ObjectId(id)});
+            const { id } = req.params;
+            const { attendance_data, transection_data } = req.body;
+
             if (attendance_data) {
                 const result = await constructionStaffsCollection.updateOne(
                     { _id: new ObjectId(id) },
-                    { $set: { 
-                        staff_working_details: [ ...staff.staff_working_details, attendance_data],
-                        income: staff.income + attendance_data.income,
-                        available_balance: staff.available_balance + attendance_data.income
-                    } }
+                    {
+                        $push: { staff_working_details: attendance_data },
+                        $inc: {
+                            income: attendance_data.income,
+                            available_balance: attendance_data.income
+                        }
+                    }
                 );
-                res.send(result);
+                return res.send(result);
             }
-            else if (transection_data) {
+
+            if (transection_data) {
                 const result = await constructionStaffsCollection.updateOne(
                     { _id: new ObjectId(id) },
-                    { $set: { 
-                        staff_transections: [...staff.staff_transections, transection_data],
-                        withdraw: staff.withdraw + transection_data.amount,
-                        available_balance: staff.available_balance - transection_data.amount
-                    } }
+                    {
+                        $push: {
+                            staff_transections: {
+                                $each: [transection_data],
+                                $slice: -50   // ✅ keep only last 2 transactions
+                            }
+                        },
+                        $inc: {
+                            withdraw: transection_data.amount,
+                            available_balance: -transection_data.amount
+                        }
+                    }
                 );
-                res.send(result);
+                return res.send(result);
             }
-        })
+
+            res.status(400).send({ message: "No valid data provided" });
+        });
 
         app.delete('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
@@ -108,9 +119,9 @@ async function run() {
         })
         app.patch('/construction_staffs_edit_form/:id', async (req, res) => {
             const id = req.params.id;
-            const {staff_name, staff_address, staff_number, work_category, staff_category, staff_nid, staff_emergency, staff_blood, staff_salary, staff_reference} = req.body;
+            const { staff_name, staff_address, staff_number, work_category, staff_category, staff_nid, staff_emergency, staff_blood, staff_salary, staff_reference } = req.body;
             const result = await constructionStaffsCollection.updateOne(
-                {_id: new ObjectId(id)},
+                { _id: new ObjectId(id) },
                 {
                     $set: {
                         staff_name,
@@ -178,6 +189,14 @@ async function run() {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const result = await constructionProjectsCollection.deleteOne(filter);
+            res.send(result);
+        })
+
+        app.patch('/construction_projects_status/:id', async (req, res) => {
+            const id = req.params.id;
+            const {status} = req.body;
+            const filter = {_id: new ObjectId(id)}
+            const result = await constructionProjectsCollection.updateOne(filter, {$set: {status}});
             res.send(result);
         })
 
