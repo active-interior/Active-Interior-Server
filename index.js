@@ -33,6 +33,9 @@ async function run() {
         const constructionStaffsCollection = client.db('Active-Interior').collection('construction_staffs');
         const constructionProjectsCollection = client.db('Active-Interior').collection('construction_projects');
         const workCategoryCollection = client.db('Active-Interior').collection('work_category');
+        const voucherSLCollection = client.db('Active-Interior').collection('voucher_sl_no');
+        const transactionSLCollection = client.db('Active-Interior').collection('transaction_sl_no');
+        const accountsCollection = client.db('Active-Interior').collection('Accounts');
 
         // ------------- Construction Staffs
         app.get('/construction_staffs', async (req, res) => {
@@ -79,7 +82,7 @@ async function run() {
                         $push: {
                             staff_transections: {
                                 $each: [transection_data],
-                                $slice: -50   // ✅ keep only last 2 transactions
+                                $slice: -50   // ✅ keep only last 50 transactions
                             }
                         },
                         $inc: {
@@ -176,12 +179,40 @@ async function run() {
 
         app.put('/construction_projects/:id', async (req, res) => {
             const id = req.params.id;
-            const costData = req.body;
-            const filter = { _id: new ObjectId(id) };
-            const updateDoc = {
-                $push: { project_cost: costData }
+            const { date, cost_category, cost_description, amount } = req.body;
+
+            const filter = {
+                _id: new ObjectId(id),
+                project_cost: {
+                    $elemMatch: {
+                        date,
+                        cost_category,
+                        cost_description
+                    }
+                }
+            };
+            const update = {
+                $inc: {
+                    "project_cost.$.amount": amount
+                }
+            };
+            const result = await constructionProjectsCollection.updateOne(filter, update);
+
+            if (result.matchedCount === 0) {
+                await constructionProjectsCollection.updateOne(
+                    { _id: new ObjectId(id) },
+                    {
+                        $push: {
+                            project_cost: {
+                                date,
+                                cost_category,
+                                cost_description,
+                                amount
+                            }
+                        }
+                    }
+                );
             }
-            const result = await constructionProjectsCollection.updateOne(filter, updateDoc, { upsert: true });
             res.send(result);
         })
 
@@ -194,17 +225,172 @@ async function run() {
 
         app.patch('/construction_projects_status/:id', async (req, res) => {
             const id = req.params.id;
-            const {status} = req.body;
-            const filter = {_id: new ObjectId(id)}
-            const result = await constructionProjectsCollection.updateOne(filter, {$set: {status}});
+            const { status } = req.body;
+            const filter = { _id: new ObjectId(id) }
+            const result = await constructionProjectsCollection.updateOne(filter, { $set: { status } });
+            res.send(result);
+        })
+
+
+        // ------------------------ Voucher and Transaction Sl No ------------------------------
+
+
+        app.get('/voucher_sl_no', async (req, res) => {
+            const result = await voucherSLCollection.findOne({});
+            res.send(result);
+        })
+        app.get('/transaction_sl_no', async (req, res) => {
+            const result = await transactionSLCollection.findOne({});
             res.send(result);
         })
 
 
 
+        // ------------------------ End Voucher and Transaction Sl No ------------------------------
 
 
 
+        // ---------------------- Cash In ---------------------------------
+
+        app.patch('/project_cash_in/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await constructionProjectsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        project_transaction: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
+
+
+        // ---------------------- End Cash In ---------------------------------
+
+
+        // -------------------------- Revenue Transactions -----------------------
+
+        app.patch('/revenue_transactions', async (req, res) => {
+            const existing = await accountsCollection.findOne({});
+            const filter = { _id: existing._id }
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        revenue_transactions: {
+                            $each: [transactionData],
+                        },
+                        last_20_transaction: {
+                            $each: [transactionData],
+                            $slice: -20
+                        }
+                    },
+                    $inc: {
+                        current_balance: transactionData.amount,
+                        total_cash_in: transactionData.amount
+                    }
+                }
+            );
+            res.send(result);
+            const transactionSLExisting = await transactionSLCollection.findOne({});
+            const slUpdateResult = await transactionSLCollection.updateOne(
+                { _id: transactionSLExisting._id },
+                {
+                    $inc: {
+                        sl_no: 1
+                    }
+                }
+            )
+            res.send(slUpdateResult);
+        })
+
+        // -------------------------- End Revenue Transactions -----------------------
+
+        // -------------------------- Expense Transactions ---------------------------
+
+        app.patch('/expense_transactions', async (req, res) => {
+            try {
+                const transactionData = req.body;
+                const { date, category, amount } = transactionData;
+
+                const existing = await accountsCollection.findOne({});
+                if (!existing) {
+                    return res.status(404).json({ message: "Account not found" });
+                }
+
+                const filter = {
+                    _id: existing._id,
+                    expense_transactions: { $elemMatch: { date, category } }
+                };
+
+                const update = {
+                    $inc: {
+                        "expense_transactions.$.amount": amount,
+                        current_balance: -amount,
+                        total_cash_out: amount
+                    }
+                };
+
+                const lastTransactionFilter = {
+                    _id: existing._id,
+                    last_20_transaction: { $elemMatch: { date, category } }
+                };
+
+                const lastTransactionUpdate = {
+                    $inc: { "last_20_transaction.$.amount": amount }
+                };
+
+                const result = await accountsCollection.updateOne(filter, update);
+                const lastTransactionResult = await accountsCollection.updateOne(
+                    lastTransactionFilter,
+                    lastTransactionUpdate
+                );
+
+                let pushed = false;
+
+                if (result.matchedCount === 0 && lastTransactionResult.matchedCount === 0) {
+                    await accountsCollection.updateOne(
+                        { _id: existing._id },
+                        {
+                            $push: {
+                                expense_transactions: transactionData,
+                                last_20_transaction: {
+                                    $each: [transactionData],
+                                    $slice: -20
+                                }
+                            },
+                            $inc: { current_balance: -amount, total_cash_out: amount }
+                        }
+                    );
+                    pushed = true;
+                }
+
+                const transactionSLExisting = await transactionSLCollection.findOne({});
+                const slUpdateResult = await transactionSLCollection.updateOne(
+                    { _id: transactionSLExisting._id },
+                    { $inc: { sl_no: 1 } }
+                );
+
+                // ✅ SINGLE RESPONSE
+                res.json({
+                    updatedExpense: result,
+                    updatedLast20: lastTransactionResult,
+                    pushedNew: pushed,
+                    slUpdate: slUpdateResult
+                });
+
+            } catch (err) {
+                res.status(500).json({ error: err.message });
+            }
+        });
+
+        // -------------------------- End Expense Transactions ---------------------------
 
 
 
