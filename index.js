@@ -30,28 +30,30 @@ async function run() {
         await client.connect();
 
 
-        const constructionStaffsCollection = client.db('Active-Interior').collection('construction_staffs');
-        const constructionProjectsCollection = client.db('Active-Interior').collection('construction_projects');
+        const staffsCollection = client.db('Active-Interior').collection('staffs');
+        const projectsCollection = client.db('Active-Interior').collection('projects');
         const workCategoryCollection = client.db('Active-Interior').collection('work_category');
         const voucherSLCollection = client.db('Active-Interior').collection('voucher_sl_no');
         const transactionSLCollection = client.db('Active-Interior').collection('transaction_sl_no');
         const accountsCollection = client.db('Active-Interior').collection('Accounts');
+        const expensesCollection = client.db('Active-Interior').collection('expenses');
+        const revenuesCollection = client.db('Active-Interior').collection('revenues');
 
         // ------------- Construction Staffs
         app.get('/construction_staffs', async (req, res) => {
-            const result = await constructionStaffsCollection.find().toArray();
+            const result = await staffsCollection.find().toArray();
             res.send(result);
         })
         app.get('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
-            const result = await constructionStaffsCollection.findOne({ _id: new ObjectId(id) });
+            const result = await staffsCollection.findOne({ _id: new ObjectId(id) });
             res.send(result);
         })
 
         app.post('/construction_staffs', async (req, res) => {
             const data = req.body;
             try {
-                const result = await constructionStaffsCollection.insertOne(data);
+                const result = await staffsCollection.insertOne(data);
                 res.send(result);
             } catch (err) {
                 res.status(500).send({ error: "Failed to insert user request" });
@@ -62,7 +64,7 @@ async function run() {
             const { attendance_data, transection_data } = req.body;
 
             if (attendance_data) {
-                const result = await constructionStaffsCollection.updateOne(
+                const result = await staffsCollection.updateOne(
                     { _id: new ObjectId(id) },
                     {
                         $push: { staff_working_details: attendance_data },
@@ -76,7 +78,7 @@ async function run() {
             }
 
             if (transection_data) {
-                const result = await constructionStaffsCollection.updateOne(
+                const result = await staffsCollection.updateOne(
                     { _id: new ObjectId(id) },
                     {
                         $push: {
@@ -100,14 +102,14 @@ async function run() {
         app.delete('/construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
-            const result = await constructionStaffsCollection.deleteOne(filter);
+            const result = await staffsCollection.deleteOne(filter);
             res.send(result);
         })
 
         app.patch('/close_construction_staffs/:id', async (req, res) => {
             const id = req.params.id;
             const data = req.body
-            const result = await constructionStaffsCollection.updateOne(
+            const result = await staffsCollection.updateOne(
                 { _id: new ObjectId(id) },
                 {
                     $set: {
@@ -123,7 +125,7 @@ async function run() {
         app.patch('/construction_staffs_edit_form/:id', async (req, res) => {
             const id = req.params.id;
             const { staff_name, staff_address, staff_number, work_category, staff_category, staff_nid, staff_emergency, staff_blood, staff_salary, staff_reference } = req.body;
-            const result = await constructionStaffsCollection.updateOne(
+            const result = await staffsCollection.updateOne(
                 { _id: new ObjectId(id) },
                 {
                     $set: {
@@ -155,7 +157,7 @@ async function run() {
         // ================== End Work Category =========================
         // -------------------- Construction Projects
         app.get('/construction_projects', async (req, res) => {
-            const result = await constructionProjectsCollection.find().toArray();
+            const result = await projectsCollection.find().toArray();
             res.send(result);
         })
 
@@ -163,14 +165,14 @@ async function run() {
         app.get('/construction_projects/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
-            const result = await constructionProjectsCollection.findOne(filter);
+            const result = await projectsCollection.findOne(filter);
             res.send(result);
         })
 
         app.post('/construction_projects', async (req, res) => {
             const data = req.body;
             try {
-                const result = await constructionProjectsCollection.insertOne(data);
+                const result = await projectsCollection.insertOne(data);
                 res.send(result);
             } catch (err) {
                 res.status(500).send({ error: "Failed to insert user request" });
@@ -196,10 +198,10 @@ async function run() {
                     "project_cost.$.amount": amount
                 }
             };
-            const result = await constructionProjectsCollection.updateOne(filter, update);
+            const result = await projectsCollection.updateOne(filter, update);
 
             if (result.matchedCount === 0) {
-                await constructionProjectsCollection.updateOne(
+                await projectsCollection.updateOne(
                     { _id: new ObjectId(id) },
                     {
                         $push: {
@@ -219,7 +221,7 @@ async function run() {
         app.delete('/construction_projects/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
-            const result = await constructionProjectsCollection.deleteOne(filter);
+            const result = await projectsCollection.deleteOne(filter);
             res.send(result);
         })
 
@@ -227,7 +229,7 @@ async function run() {
             const id = req.params.id;
             const { status } = req.body;
             const filter = { _id: new ObjectId(id) }
-            const result = await constructionProjectsCollection.updateOne(filter, { $set: { status } });
+            const result = await projectsCollection.updateOne(filter, { $set: { status } });
             res.send(result);
         })
 
@@ -243,20 +245,41 @@ async function run() {
             const result = await transactionSLCollection.findOne({});
             res.send(result);
         })
+        app.patch('/voucher_sl_no', async (req, res) => {
+            const voucherSLExisting = await voucherSLCollection.findOne({});
+            const slUpdateResult = await voucherSLCollection.updateOne(
+                { _id: voucherSLExisting._id },
+                { $inc: { sl_no: 1 } }
+            );
+            res.send(slUpdateResult);
+        })
+        app.patch('/transaction_sl_no', async (req, res) => {
+            const transactionSLExisting = await transactionSLCollection.findOne({});
+            const slUpdateResult = await transactionSLCollection.updateOne(
+                { _id: transactionSLExisting._id },
+                { $inc: { sl_no: 1 } }
+            );
+            res.send(slUpdateResult);
+        })
 
 
 
         // ------------------------ End Voucher and Transaction Sl No ------------------------------
 
+        // -------------------------- Accounts -------------------------------
+        app.get('/accounts', async (req, res) => {
+            const result = await accountsCollection.findOne({});
+            res.send(result);
+        })
+        // -------------------------- End Accounts -------------------------------
 
-
-        // ---------------------- Cash In ---------------------------------
+        // ---------------------- Accounts Cash In ---------------------------------
 
         app.patch('/project_cash_in/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const transactionData = req.body;
-            const result = await constructionProjectsCollection.updateOne(
+            const result = await projectsCollection.updateOne(
                 filter,
                 {
                     $push: {
@@ -268,12 +291,63 @@ async function run() {
             );
             res.send(result);
         })
+        app.patch('/loans', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        loans: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
+        app.patch('/personal_investments', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        personal_investments: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
+        app.patch('/others_received', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        others_received: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
 
 
-        // ---------------------- End Cash In ---------------------------------
+        // ---------------------- End Accounts Cash In ---------------------------------
 
 
-        // -------------------------- Revenue Transactions -----------------------
+        // -------------------------- Accounts Revenue Transactions -----------------------
 
         app.patch('/revenue_transactions', async (req, res) => {
             const existing = await accountsCollection.findOne({});
@@ -298,26 +372,16 @@ async function run() {
                 }
             );
             res.send(result);
-            const transactionSLExisting = await transactionSLCollection.findOne({});
-            const slUpdateResult = await transactionSLCollection.updateOne(
-                { _id: transactionSLExisting._id },
-                {
-                    $inc: {
-                        sl_no: 1
-                    }
-                }
-            )
-            res.send(slUpdateResult);
         })
 
-        // -------------------------- End Revenue Transactions -----------------------
+        // -------------------------- End Accounts Revenue Transactions -----------------------
 
-        // -------------------------- Expense Transactions ---------------------------
+        // -------------------------- Accounts Expense Transactions ---------------------------
 
         app.patch('/expense_transactions', async (req, res) => {
             try {
                 const transactionData = req.body;
-                const { date, category, amount } = transactionData;
+                const { date, category, amount, reference } = transactionData;
 
                 const existing = await accountsCollection.findOne({});
                 if (!existing) {
@@ -330,11 +394,14 @@ async function run() {
                 };
 
                 const update = {
+                    $push: {
+                        "expense_transactions.$.reference": reference[0]
+                    },
                     $inc: {
                         "expense_transactions.$.amount": amount,
                         current_balance: -amount,
                         total_cash_out: amount
-                    }
+                    },
                 };
 
                 const lastTransactionFilter = {
@@ -343,6 +410,9 @@ async function run() {
                 };
 
                 const lastTransactionUpdate = {
+                    $push: {
+                        "last_20_transaction.$.reference": reference[0]
+                    },
                     $inc: { "last_20_transaction.$.amount": amount }
                 };
 
@@ -371,18 +441,11 @@ async function run() {
                     pushed = true;
                 }
 
-                const transactionSLExisting = await transactionSLCollection.findOne({});
-                const slUpdateResult = await transactionSLCollection.updateOne(
-                    { _id: transactionSLExisting._id },
-                    { $inc: { sl_no: 1 } }
-                );
-
                 // ✅ SINGLE RESPONSE
                 res.json({
                     updatedExpense: result,
                     updatedLast20: lastTransactionResult,
-                    pushedNew: pushed,
-                    slUpdate: slUpdateResult
+                    pushedNew: pushed
                 });
 
             } catch (err) {
@@ -390,7 +453,76 @@ async function run() {
             }
         });
 
-        // -------------------------- End Expense Transactions ---------------------------
+        // -------------------------- End Accounts Expense Transactions ---------------------------
+
+
+        // -------------------------------- All Revenue Transaction --------------------------------
+
+        app.patch('/revenues', async (req, res) => {
+            const transactionData = req.body;
+
+            // Get single expenses document
+            const existing = await revenuesCollection.findOne({});
+            if (!existing) {
+                return res.status(404).send({ message: "Revenue document not found" });
+            }
+
+            const filter = { _id: existing._id };
+
+            const categoryExists = existing.categories?.includes(transactionData.category);
+
+            const updateOps = {
+                $push: {
+                    transactions: transactionData
+                }
+            };
+
+            if (!categoryExists) {
+                updateOps.$push.categories = transactionData.category;
+            }
+
+            const result = await revenuesCollection.updateOne(filter, updateOps);
+
+            res.send(result);
+        });
+
+        // -------------------------------- End All Revenue Transaction --------------------------------
+
+
+
+
+        // -------------------------------- All Expense Transaction --------------------------------
+
+        app.patch('/expenses', async (req, res) => {
+            const transactionData = req.body;
+
+            // Get single expenses document
+            const existing = await expensesCollection.findOne({});
+            if (!existing) {
+                return res.status(404).send({ message: "Expenses document not found" });
+            }
+
+            const filter = { _id: existing._id };
+
+            const categoryExists = existing.categories?.includes(transactionData.category);
+
+            const updateOps = {
+                $push: {
+                    transactions: transactionData
+                }
+            };
+
+            if (!categoryExists) {
+                updateOps.$push.categories = transactionData.category;
+            }
+
+            const result = await expensesCollection.updateOne(filter, updateOps);
+
+            res.send(result);
+        });
+
+
+        // -------------------------------- End All Expense Transaction --------------------------------
 
 
 
