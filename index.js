@@ -291,6 +291,23 @@ async function run() {
             );
             res.send(result);
         })
+        app.patch('/projects_payment', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        project_payment: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
         app.patch('/loans', async (req, res) => {
             const item = await accountsCollection.findOne({});
             const id = item?._id;
@@ -458,6 +475,11 @@ async function run() {
 
         // -------------------------------- All Revenue Transaction --------------------------------
 
+        app.get('/revenues', async (req, res) => {
+            const result = await revenuesCollection.find().toArray();
+            res.send(result);
+        })
+
         app.patch('/revenues', async (req, res) => {
             const transactionData = req.body;
 
@@ -492,6 +514,11 @@ async function run() {
 
 
         // -------------------------------- All Expense Transaction --------------------------------
+
+        app.get('/expenses', async (req, res) => {
+            const result = await expensesCollection.find().toArray();
+            res.send(result);
+        })
 
         app.patch('/expenses', async (req, res) => {
             const transactionData = req.body;
