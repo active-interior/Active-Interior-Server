@@ -179,9 +179,9 @@ async function run() {
             }
         })
 
-        app.put('/construction_projects/:id', async (req, res) => {
+        app.patch('/construction_projects/:id', async (req, res) => {
             const id = req.params.id;
-            const { date, cost_category, cost_description, amount } = req.body;
+            const { date, cost_category, cost_description, amount, staff_details } = req.body;
 
             const filter = {
                 _id: new ObjectId(id),
@@ -196,6 +196,9 @@ async function run() {
             const update = {
                 $inc: {
                     "project_cost.$.amount": amount
+                },
+                $push: {
+                    "project_cost.$.staff_details": staff_details[0]
                 }
             };
             const result = await projectsCollection.updateOne(filter, update);
@@ -208,6 +211,7 @@ async function run() {
                             project_cost: {
                                 date,
                                 cost_category,
+                                staff_details,
                                 cost_description,
                                 amount
                             }
@@ -362,6 +366,199 @@ async function run() {
 
 
         // ---------------------- End Accounts Cash In ---------------------------------
+
+
+
+
+        // ---------------------- Accounts Cash Out ---------------------------------
+
+        app.patch('/payback_loan/:trx_no', async (req, res) => {
+            try {
+                const loan_id = Number(req.params.trx_no);
+                const item = await accountsCollection.findOne({});
+                if (!item) {
+                    return res.status(404).send({ message: "Account not found" });
+                }
+                const { transaction_no, date, receiver_name, payment_method, place_of_payment, amount, due } = req.body;
+                const transactionData = { transaction_no, date, receiver_name, payment_method, place_of_payment, amount };
+                const filter = {
+                    _id: new ObjectId(item?._id),
+                    loans: {
+                        $elemMatch: {
+                            transaction_no: loan_id
+                        }
+                    }
+                };
+                const update = {
+                    $inc: {
+                        "loans.$.paid_amount": amount
+                    },
+                    $push: {
+                        "loans.$.paid_transactions": transactionData
+                    }
+                };
+                const updateWithStatus = {
+                    $inc: {
+                        "loans.$.paid_amount": amount
+                    },
+                    $push: {
+                        "loans.$.paid_transactions": transactionData
+                    },
+                    $set: {
+                        "loans.$.status": false
+                    }
+                };
+
+                if (due <= 0) {
+                    const result = await accountsCollection.updateOne(filter, updateWithStatus);
+                    res.send(result);
+                    console.log(result)
+                } else {
+                    const result = await accountsCollection.updateOne(filter, update);
+                    res.send(result);
+                    console.log(result)
+                }
+            } catch (error) {
+                res.status(500).send({ error: error.message });
+            }
+        })
+
+        app.patch('/pay_due', async (req, res) => {
+            const transactionData = req.body;
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            // const filter = { _id: new ObjectId(id) };
+            const main_transaction_id = transactionData?.main_transaction_no;
+            const filter = {
+                _id: new ObjectId(id),
+                materials_purchase: {
+                    $elemMatch: {
+                        transaction_no: main_transaction_id
+                    }
+                }
+            };
+            const { transaction_no, date, receiver_name, payment_method, amount } = transactionData;
+            const TransactionData = { date, transaction_no, receiver_name, payment_method, amount };
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        "materials_purchase.$.transactions": TransactionData
+                    },
+                    $inc: {
+                        "materials_purchase.$.due": -amount
+                    }
+                }
+            );
+            res.send(result);
+        })
+        app.patch('/materials_purchase', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const { date, transaction_no, service_and_laborer, parts_and_materials, other_cost, tax, total, cost_category } = transactionData;
+            const projectData = { date, transaction_no, cost_category, service_and_laborer, parts_and_materials, other_cost, tax, total };
+            if (transactionData?.purchase_for !== 'For Store') {
+                await projectsCollection.updateOne({ project_name: transactionData?.purchase_for }, {
+                    $push: {
+                        materials_purchase: {
+                            $each: [projectData],
+                        }
+                    }
+                })
+            }
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        materials_purchase: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
+
+        app.patch('/payback_loan_expense', async (req, res) => {
+            try {
+                const item = await accountsCollection.findOne({});
+                if (!item) {
+                    return res.status(404).send({ message: "Account not found" });
+                }
+
+                const result = await accountsCollection.updateOne(
+                    { _id: item._id },
+                    {
+                        $push: {
+                            payback_loans: req.body
+                        }
+                    }
+                );
+
+                res.send(result);
+
+            } catch (error) {
+                res.status(500).send({ error: error.message });
+            }
+        });
+
+        app.patch('/office_expenses', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        office_expenses: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
+        app.patch('/personal_expenses', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        personal_expenses: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
+        app.patch('/others_expenses', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        others_expenses: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
+
+
+        // ---------------------- End Accounts Cash Out ---------------------------------
+
 
 
         // -------------------------- Accounts Revenue Transactions -----------------------
