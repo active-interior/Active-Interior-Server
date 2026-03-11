@@ -146,6 +146,15 @@ async function run() {
         })
 
 
+        app.patch('/construction_staff_status/:id', async (req, res) => {
+            const id = req.params.id;
+            const { status } = req.body;
+            const filter = { _id: new ObjectId(id) }
+            const result = await staffsCollection.updateOne(filter, { $set: { status } });
+            res.send(result);
+        })
+
+
         // ==================== Work Category ===========================
 
         app.get('/work_category', async (req, res) => {
@@ -295,6 +304,23 @@ async function run() {
             );
             res.send(result);
         })
+        app.patch('/materials_sell', async (req, res) => {
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            const filter = { _id: new ObjectId(id) };
+            const transactionData = req.body;
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        materials_sell: {
+                            $each: [transactionData],
+                        }
+                    }
+                }
+            );
+            res.send(result);
+        })
         app.patch('/projects_payment', async (req, res) => {
             const item = await accountsCollection.findOne({});
             const id = item?._id;
@@ -358,6 +384,37 @@ async function run() {
                         others_received: {
                             $each: [transactionData],
                         }
+                    }
+                }
+            );
+            res.send(result);
+        })
+
+        app.patch('/receive_due', async (req, res) => {
+            const transactionData = req.body;
+            const item = await accountsCollection.findOne({});
+            const id = item?._id;
+            // const filter = { _id: new ObjectId(id) };
+            const main_transaction_id = transactionData?.main_transaction_no;
+            const filter = {
+                _id: new ObjectId(id),
+                materials_sell: {
+                    $elemMatch: {
+                        transaction_no: main_transaction_id
+                    }
+                }
+            };
+            const { transaction_no, date, payer_name, amount } = transactionData;
+            const TransactionData = { date, transaction_no, payer_name, amount };
+            const result = await accountsCollection.updateOne(
+                filter,
+                {
+                    $push: {
+                        "materials_sell.$.transactions": TransactionData
+                    },
+                    $inc: {
+                        "materials_sell.$.due": -amount,
+                        "materials_sell.$.cash_received": amount
                     }
                 }
             );
@@ -446,7 +503,8 @@ async function run() {
                         "materials_purchase.$.transactions": TransactionData
                     },
                     $inc: {
-                        "materials_purchase.$.due": -amount
+                        "materials_purchase.$.due": -amount,
+                        "materials_purchase.$.paid": amount,
                     }
                 }
             );
